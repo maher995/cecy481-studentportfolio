@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, redirect
+from markupsafe import escape
 from pathlib import Path
 app=Flask(__name__)
 DATA=Path(__file__).resolve().parent/'feedback.txt'
@@ -7,7 +8,7 @@ def index(): return 'StudentPortfolio: /profile?name=Student, POST /feedback, /f
 @app.get('/profile')
 def profile():
     name=request.args.get('name','Student')
-    return '<h1>Portfolio of '+name+'</h1><p>Software security projects</p>'
+    return f'<h1>Portfolio of {escape(name)}</h1><p>Software security projects</p>'
 @app.post('/feedback')
 def add_feedback():
     text=request.form.get('message','')
@@ -15,7 +16,12 @@ def add_feedback():
     return jsonify(saved=True)
 @app.get('/feedback')
 def feedback():
-    return '<h2>Feedback</h2>'+('<hr>'.join(DATA.read_text().splitlines()) if DATA.exists() else 'No feedback')
+    if not DATA.exists():
+        return '<h2>Feedback</h2>No feedback'
+
+    entries = DATA.read_text(encoding='utf-8').splitlines()
+    safe_entries = '<hr>'.join(str(escape(entry)) for entry in entries)
+    return '<h2>Feedback</h2>' + safe_entries
 @app.get('/go')
 def go(): return redirect(request.args.get('next','/'))
 if __name__=='__main__': app.run(host='127.0.0.1',port=5105,debug=False)
