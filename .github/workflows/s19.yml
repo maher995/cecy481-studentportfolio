@@ -1,0 +1,41 @@
+name: S19 patched source rescan
+on:
+  push:
+    branches: [fixes]
+    paths: ['.github/workflows/s19.yml', 'app.py']
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install scanners
+        run: python -m pip install bandit==1.9.4 semgrep==1.187.0 || python -m pip install bandit semgrep
+      - name: Scan patched app.py
+        run: |
+          mkdir reports
+          bandit --exit-zero -f json -o reports/bandit.json app.py
+          semgrep scan --config auto --metrics=off --json-output reports/semgrep_auto.json app.py
+          semgrep scan --config p/python --config p/flask --metrics=off --json-output reports/semgrep_focused.json app.py
+          python - <<'PY'
+          import importlib.metadata as m, json, pathlib
+          from pathlib import Path
+          print('Versions:', m.version('bandit'), m.version('semgrep'))
+          for path in sorted(Path('reports').glob('*.json')):
+              report = json.loads(path.read_text())
+              assert not report.get('errors'), report.get('errors')
+              if path.stem == 'bandit':
+                  assert report['metrics']['_totals']['loc'] > 0
+              else:
+                  assert any(Path(p).name == 'app.py' for p in report['paths']['scanned'])
+              print(path.stem, len(report['results']), 'findings')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: S19-reports
+          path: reports/*.json
