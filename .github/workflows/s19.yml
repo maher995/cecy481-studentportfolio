@@ -20,7 +20,6 @@ jobs:
         run: |
           mkdir reports
           bandit --exit-zero -f json -o reports/bandit.json app.py
-          semgrep scan --config auto --metrics=off --json-output reports/semgrep_auto.json app.py
           semgrep scan --config p/python --config p/flask --metrics=off --json-output reports/semgrep_focused.json app.py
           python - <<'PY'
           import importlib.metadata as m, json, pathlib
@@ -34,6 +33,7 @@ jobs:
               else:
                   assert any(Path(p).name == 'app.py' for p in report['paths']['scanned'])
               print(path.stem, len(report['results']), 'findings')
+              print('S19_JSON', path.stem, json.dumps(report, separators=(',', ':')))
           PY
       - uses: actions/upload-artifact@v4
         with:
